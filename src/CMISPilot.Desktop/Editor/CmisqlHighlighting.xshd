@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="CMISQL" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Keyword" foreground="#569CD6" fontWeight="bold" />
+  <Color name="Function" foreground="#4EC9B0" />
+  <Color name="Property" foreground="#9CDCFE" />
+  <Color name="String" foreground="#CE9178" />
+  <Color name="Number" foreground="#B5CEA8" />
+
+  <RuleSet ignoreCase="true">
+    <Keywords color="Keyword">
+      <Word>SELECT</Word>
+      <Word>FROM</Word>
+      <Word>WHERE</Word>
+      <Word>AND</Word>
+      <Word>OR</Word>
+      <Word>NOT</Word>
+      <Word>AS</Word>
+      <Word>IN</Word>
+      <Word>LIKE</Word>
+      <Word>IS</Word>
+      <Word>NULL</Word>
+      <Word>TRUE</Word>
+      <Word>FALSE</Word>
+      <Word>ANY</Word>
+      <Word>ORDER</Word>
+      <Word>BY</Word>
+      <Word>ASC</Word>
+      <Word>DESC</Word>
+      <Word>JOIN</Word>
+      <Word>INNER</Word>
+      <Word>LEFT</Word>
+      <Word>OUTER</Word>
+      <Word>ON</Word>
+      <Word>TIMESTAMP</Word>
+    </Keywords>
+
+    <!-- CMISQL-eigene Funktionen, die kein anderes CMIS-Repository-Format kennt. -->
+    <Keywords color="Function">
+      <Word>IN_FOLDER</Word>
+      <Word>IN_TREE</Word>
+      <Word>CONTAINS</Word>
+      <Word>SCORE</Word>
+    </Keywords>
+
+    <!-- cmis:-Property-Praefix (z. B. cmis:name, cmis:objectId). -->
+    <Rule color="Property">
+      cmis:[A-Za-z_][A-Za-z0-9_]*
+    </Rule>
+
+    <Span color="String">
+      <Begin>'</Begin>
+      <End>'</End>
+    </Span>
+
+    <Rule color="Number">
+      \b\d+(\.\d+)?\b
+    </Rule>
+  </RuleSet>
+</SyntaxDefinition>

@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!--
+      UseWPF, weil Beitraege Ressourcen-Woerterbuecher (DataTemplates, Ribbon-Tabs)
+      als pack://-URI benennen und der Loader sie als ResourceDictionary laedt.
+    -->
+    <UseWPF>true</UseWPF>
+    <RootNamespace>CMISPilot.Plugins</RootNamespace>
+    <AssemblyName>CMISPilot.Plugins.Abstractions</AssemblyName>
+
+    <!--
+      Version des Plugin-Vertrags. Aendert sich nur, wenn sich diese Schnittstelle
+      selbst aendert - nicht bei jedem CMISPilot-Release. Der Loader vergleicht die
+      Hauptversion (siehe PluginContract.Version).
+    -->
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- DocumentViewModelBase: Basisklasse der beigesteuerten Dokument-Tabs. -->
+    <ProjectReference Include="..\..\..\..\APX.Wpf.Shell\WL\src\APX.Wpf.Shell.ViewModels\APX.Wpf.Shell.ViewModels.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,363 @@
+<Window x:Class="CMISPilot.Desktop.Dialogs.ConnectDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:conv="clr-namespace:CMISPilot.Desktop.Converters"
+        mc:Ignorable="d"
+        Title="Verbinden" Width="880" Height="820" MinWidth="700" MinHeight="680"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        Foreground="{DynamicResource AppTextPrimaryBrush}"
+        Background="{DynamicResource AppSurfaceAltBrush}">
+
+    <Window.Resources>
+        <conv:StringToVisibilityConverter x:Key="StringToVis" />
+        <conv:AuthenticationTypeLabelConverter x:Key="AuthLabel" />
+        <conv:BindingTypeLabelConverter x:Key="BindingLabel" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- Steuerelement-Styles (FieldLabel, TextBox, PasswordBox, ComboBox,
+             CheckBox, Card, Buttons) kommen aus APX.Wpf.Shell/Themes/Styles.xaml
+             (App*-Schluessel), damit alle Dialoge dasselbe Erscheinungsbild
+             teilen und einem Theme-Wechsel folgen. Fuer die Profilliste gibt es
+             dort (noch) keinen ListBox/ListBoxItem-Schluessel - bewusst nur hier,
+             auf diesen einen Dialog begrenzt, statt die geteilte Bibliothek fuer
+             eine einzelne Stelle zu erweitern. -->
+        <Style x:Key="ProfileListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppSurfaceAltBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppAccentBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Profilliste + Listen-Kommandos. -->
+            <DockPanel Grid.Column="0">
+                <TextBlock DockPanel.Dock="Top" Text="Verbindungsziele"
+                           FontWeight="SemiBold" Margin="0,0,0,8" />
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button Content="Neu" Padding="12,6" Margin="0,0,6,0"
+                            Style="{DynamicResource AppSecondaryButtonStyle}"
+                            Command="{Binding NewCommand}" />
+                    <Button Content="Duplizieren" Padding="12,6" Margin="0,0,6,0"
+                            Style="{DynamicResource AppSecondaryButtonStyle}"
+                            Command="{Binding DuplicateCommand}" />
+                    <Button Content="Löschen" Padding="12,6"
+                            Style="{DynamicResource AppSecondaryButtonStyle}"
+                            Command="{Binding DeleteCommand}" />
+                </StackPanel>
+                <Border Style="{DynamicResource AppCardStyle}" Padding="6">
+                    <ListBox ItemsSource="{Binding ListEntries}"
+                             SelectedItem="{Binding SelectedListEntry, Mode=TwoWay}"
+                             ItemContainerStyle="{StaticResource ProfileListBoxItemStyle}"
+                             BorderThickness="0" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsNewEntry}" Value="True">
+                                                    <Setter Property="FontStyle" Value="Italic" />
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </DockPanel>
+
+            <!-- Formular: Einstellungen des gewaehlten (oder neuen) Verbindungsziels,
+                 nach Themen in Tabs sortiert (ungestyltes TabControl, gleiches Muster
+                 wie Ergebnis/Meldungen im Abfrage-Browser, MainWindow.xaml). -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{DynamicResource AppCardStyle}" Padding="4">
+                    <TabControl BorderThickness="0" Background="Transparent">
+                        <TabItem Header="Verbindung">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="12">
+
+                                    <TextBlock Text="Bezeichnung" Style="{DynamicResource AppFieldLabelStyle}" />
+                                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,10" />
+
+                                    <TextBlock Text="Binding" Style="{DynamicResource AppFieldLabelStyle}" />
+                                    <ComboBox ItemsSource="{Binding BindingTypes}" Style="{DynamicResource AppComboBoxStyle}"
+                                              SelectedItem="{Binding BindingType}" Margin="0,0,0,10">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource BindingLabel}}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+
+                                    <StackPanel Visibility="{Binding IsBrowserBinding, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Browser-Binding-URL" Style="{DynamicResource AppFieldLabelStyle}" />
+                                        <TextBox Text="{Binding BrowserUrl, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,10" />
+                                    </StackPanel>
+
+                                    <StackPanel Visibility="{Binding IsAtomPubBinding, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="AtomPub-URL" Style="{DynamicResource AppFieldLabelStyle}" />
+                                        <TextBox Text="{Binding AtomPubUrl, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,10" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="Authentifizierung" Style="{DynamicResource AppFieldLabelStyle}" />
+                                    <ComboBox ItemsSource="{Binding AuthenticationTypes}" Style="{DynamicResource AppComboBoxStyle}"
+                                              SelectedItem="{Binding Authentication}" Margin="0,0,0,10">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource AuthLabel}}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+
+                                    <!-- Basic Auth: Benutzer/Passwort -->
+                                    <Grid Margin="0,0,0,10" Visibility="{Binding IsStandardAuth, Converter={StaticResource BoolToVis}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Benutzer" Style="{DynamicResource AppFieldLabelStyle}" />
+                                            <TextBox Text="{Binding User, UpdateSourceTrigger=PropertyChanged}" Style="{DynamicResource AppTextBoxStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Passwort (leer lassen = unverändert)" Style="{DynamicResource AppFieldLabelStyle}" />
+                                            <!-- PasswordBox.Password ist nicht bindbar -> Code-Behind. -->
+                                            <PasswordBox x:Name="PasswordBox" PasswordChanged="OnPasswordChanged"
+                                                         Style="{DynamicResource AppPasswordBoxStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- OAuth 2.0: Bearer Token -->
+                                    <StackPanel Margin="0,0,0,10" Visibility="{Binding IsOAuthBearer, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Bearer Token (leer lassen = unverändert)" Style="{DynamicResource AppFieldLabelStyle}" />
+                                        <TextBox Text="{Binding BearerToken, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource AppTextBoxStyle}"
+                                                 TextWrapping="Wrap" MaxHeight="80" VerticalScrollBarVisibility="Auto"
+                                                 AcceptsReturn="False" />
+                                    </StackPanel>
+
+                                    <CheckBox Content="Geheimnis speichern (Passwort/Token, DPAPI-verschlüsselt)"
+                                              IsChecked="{Binding SavePassword}"
+                                              Style="{DynamicResource AppCheckBoxStyle}" Margin="0,0,0,10" />
+
+                                    <Button Content="Repositories laden" Margin="0,0,0,10" HorizontalAlignment="Left"
+                                            Command="{Binding LoadRepositoriesCommand}" Padding="14,8"
+                                            Style="{DynamicResource AppSecondaryButtonStyle}" />
+
+                                    <TextBlock Text="Repository" Style="{DynamicResource AppFieldLabelStyle}" />
+                                    <ComboBox ItemsSource="{Binding Repositories}" Style="{DynamicResource AppComboBoxStyle}"
+                                              SelectedItem="{Binding SelectedRepository}"
+                                              Margin="0,0,0,10">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                    <TextBlock Text="{Binding Id, StringFormat=' ({0})'}"
+                                                               Foreground="{DynamicResource AppTextSecondaryBrush}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <!-- Nur bei OAuth-Authentifizierung nutzbar: der Authorization-Code-
+                             Flow (Login im System-Browser, Rueckgabe eines Access Tokens ins
+                             Bearer-Token-Feld auf dem Tab "Verbindung") ist bei den anderen
+                             Auth-Arten bedeutungslos. -->
+                        <TabItem Header="OAuth" IsEnabled="{Binding IsOAuthBearer}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="12">
+
+                                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,12"
+                                               Foreground="{DynamicResource AppTextSecondaryBrush}"
+                                               Text="Holt ein Access Token beim Identity Provider und trägt es als Bearer Token ein (Tab „Verbindung“)." />
+
+                                    <CheckBox Content="Client Credentials (kein Login im Browser nötig)"
+                                              IsChecked="{Binding OAuthUseClientCredentials}"
+                                              Style="{DynamicResource AppCheckBoxStyle}" Margin="0,0,0,4" />
+                                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,12" FontSize="11"
+                                               Foreground="{DynamicResource AppTextSecondaryBrush}"
+                                               Text="Tauscht Client ID/Secret direkt gegen ein Token, ohne dass sich ein Nutzer im Browser anmeldet - das Token vertritt dann die Anwendung selbst, nicht eine bestimmte Person. Setzt voraus, dass der Identity Provider dieses Grant für den Client erlaubt." />
+
+                                    <StackPanel Visibility="{Binding IsOAuthAuthorizationCodeFlow, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Authorization Endpoint" Style="{DynamicResource AppFieldLabelStyle}" />
+                                        <TextBox Text="{Binding OAuthAuthorizationEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,10" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="Token Endpoint" Style="{DynamicResource AppFieldLabelStyle}" />
+                                    <TextBox Text="{Binding OAuthTokenEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,10" />
+
+                                    <TextBlock Text="Client ID" Style="{DynamicResource AppFieldLabelStyle}" />
+                                    <TextBox Text="{Binding OAuthClientId, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,10" />
+
+                                    <TextBlock Text="Client Secret (leer lassen = unverändert)" Style="{DynamicResource AppFieldLabelStyle}" />
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <!-- Maskierte Eingabe und Klartextanzeige liegen uebereinander (Grid.Column="0"
+                                             fuer beide); der Augen-Button (siehe Code-Behind OnToggleOAuthClientSecretVisibility)
+                                             blendet je nach Zustand genau eine der beiden ein. PasswordBox.Password ist
+                                             nicht bindbar -> beide werden per Code-Behind befuellt/ausgelesen. -->
+                                        <PasswordBox x:Name="OAuthClientSecretBox" Grid.Column="0"
+                                                     PasswordChanged="OnOAuthClientSecretChanged"
+                                                     GotFocus="OnOAuthClientSecretGotFocus" LostFocus="OnOAuthClientSecretLostFocus"
+                                                     Style="{DynamicResource AppPasswordBoxStyle}" />
+                                        <TextBox x:Name="OAuthClientSecretTextBox" Grid.Column="0" Visibility="Collapsed"
+                                                 TextChanged="OnOAuthClientSecretTextChanged"
+                                                 Style="{DynamicResource AppTextBoxStyle}" />
+                                        <ToggleButton x:Name="OAuthClientSecretRevealToggle" Grid.Column="2"
+                                                      Click="OnToggleOAuthClientSecretVisibility"
+                                                      Width="34" Padding="0"
+                                                      ToolTip="Client Secret ein-/ausblenden">
+                                            <TextBlock Text="👁" FontSize="14" HorizontalAlignment="Center" />
+                                        </ToggleButton>
+                                    </Grid>
+
+                                    <StackPanel Visibility="{Binding IsOAuthAuthorizationCodeFlow, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="Redirect URI" Style="{DynamicResource AppFieldLabelStyle}" />
+                                        <TextBox Text="{Binding OAuthRedirectUri, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,4" />
+                                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,14" FontSize="11"
+                                                   Foreground="{DynamicResource AppTextSecondaryBrush}"
+                                                   Text="Muss http://localhost:PORT/pfad sein (kein https) und beim Identity Provider für diesen Client exakt so registriert sein - CMISPilot fängt die Weiterleitung selbst kurzzeitig lokal ab." />
+                                    </StackPanel>
+
+                                    <Button Content="{Binding OAuthLoginButtonLabel}" HorizontalAlignment="Left"
+                                            Command="{Binding LoginWithOAuthCommand}" Padding="14,8"
+                                            Style="{DynamicResource AppSecondaryButtonStyle}" />
+
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem Header="Erweitert">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="12">
+
+                                    <CheckBox Content="Kompression (GZip der Serverantworten)" Style="{DynamicResource AppCheckBoxStyle}"
+                                              IsChecked="{Binding Compression}" Margin="0,0,0,10" />
+
+                                    <StackPanel Visibility="{Binding IsBrowserBinding, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="CSRF-Header (optional)" Style="{DynamicResource AppFieldLabelStyle}" />
+                                        <TextBox Text="{Binding CsrfHeader, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{DynamicResource AppTextBoxStyle}" Margin="0,0,0,10" />
+                                    </StackPanel>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Verbindungs-Timeout (Sek.)" Style="{DynamicResource AppFieldLabelStyle}" />
+                                            <TextBox Text="{Binding ConnectTimeoutSeconds, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                                                     Style="{DynamicResource AppTextBoxStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Lese-Timeout (Sek.)" Style="{DynamicResource AppFieldLabelStyle}" />
+                                            <TextBox Text="{Binding ReadTimeoutSeconds, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                                                     Style="{DynamicResource AppTextBoxStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem Header="Zusätzliche Header">
+                            <DockPanel Margin="12">
+                                <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,10"
+                                           Foreground="{DynamicResource AppTextSecondaryBrush}"
+                                           Text="Werden bei jeder Anfrage an den Server mitgeschickt (z. B. ein API-Gateway- oder Mandanten-Header). Eine Zeile mit leerem Namen wird beim Speichern/Verbinden ignoriert." />
+                                <!-- IsReadOnly=False + CanUserAddRows/DeleteRows: das Grid
+                                     verwaltet Zeilen selbst, keine eigenen Hinzufuegen-/
+                                     Loeschen-Befehle noetig (Entf loescht die markierte Zeile). -->
+                                <DataGrid ItemsSource="{Binding AdditionalHeaders}"
+                                          AutoGenerateColumns="False" IsReadOnly="False"
+                                          CanUserAddRows="True" CanUserDeleteRows="True"
+                                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                          Foreground="{DynamicResource AppTextPrimaryBrush}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                        <DataGridTextColumn Header="Wert" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </TabItem>
+                    </TabControl>
+                </Border>
+
+                <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" TextWrapping="Wrap"
+                            Foreground="{DynamicResource AppErrorBrush}" Margin="0,10,0,0"
+                            Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVis}}" />
+            </Grid>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Speichern" Padding="16,9" Margin="0,0,10,0"
+                    Style="{DynamicResource AppSecondaryButtonStyle}"
+                    Command="{Binding SaveCommand}" />
+            <Button x:Name="ConnectButton" Content="Verbinden" IsDefault="True"
+                    Click="OnConnectClick" Padding="18,9" Margin="0,0,10,0"
+                    Style="{DynamicResource AppPrimaryButtonStyle}" />
+            <Button Content="Abbrechen" IsCancel="True" Padding="18,9"
+                    Style="{DynamicResource AppSecondaryButtonStyle}" />
+        </StackPanel>
+
+    </Grid>
+</Window>

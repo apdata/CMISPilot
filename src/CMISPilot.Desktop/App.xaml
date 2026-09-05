@@ -1,0 +1,21 @@
+<Application x:Class="CMISPilot.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- R0.3: Fluent.Ribbon-Basisthemes. Das aktive Hell/Dunkel-Theme
+                     wird ab R2 zur Laufzeit über den ThemeManager gesetzt. -->
+                <ResourceDictionary Source="pack://application:,,,/Fluent;component/Themes/Generic.xaml" />
+
+                <!-- R4 Etappe 2: Baum-Icons (Server/Repository/Ordner), Konzept §3.3. -->
+                <ResourceDictionary Source="Resources/Icons/Icons.xaml" />
+
+                <!-- App-weite Button-Styles (AppPrimaryButtonStyle/AppSecondaryButtonStyle),
+                     theme-unabhaengig, deshalb hier statisch gemergt statt ueber den
+                     ThemeService. -->
+                <ResourceDictionary Source="pack://application:,,,/APX.Wpf.Shell;component/Themes/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

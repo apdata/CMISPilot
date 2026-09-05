@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Deterministische Unit-Tests der selektionsgetriebenen Ladepfade (M4, T4.5). -->
+    <InternalsVisibleTo Include="CMISPilot.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- NFA-03: ViewModels ohne WPF-Bezug, sprechen nur die Cmis-Interfaces an. -->
+    <ProjectReference Include="..\CMISPilot.Cmis\CMISPilot.Cmis.csproj" />
+    <!--
+      Gemeinsamer Oberflaechen-Kern. Zurueck auf ProjectReference: der
+      PackageReference-Weg setzte einen lokalen Ordner-Feed voraus, der sich
+      nicht durchgehend zuverlaessig aufloesen liess. Verweist ueber die
+      Repository-Grenze auf APX.Wpf.Shell und setzt damit voraus, dass beide
+      Repos nebeneinander liegen.
+    -->
+    <ProjectReference Include="..\..\..\..\APX.Wpf.Shell\WL\src\APX.Wpf.Shell.ViewModels\APX.Wpf.Shell.ViewModels.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <!-- F2: Excel-Export (Typdefinitionen, spaeter Abfrage-/Ordnerlisten). Reines
+         .NET, kein WPF-Bezug (NFA-03 bleibt gewahrt). -->
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+  </ItemGroup>
+
+</Project>

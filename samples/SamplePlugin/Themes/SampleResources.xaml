@@ -1,0 +1,74 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:Fluent="urn:fluent-ribbon"
+                    xmlns:local="clr-namespace:SamplePlugin">
+
+    <!--
+      1. DataTemplate fuer den Dokument-Tab des Plugins. WPF findet dieses Template,
+         weil dieses Woerterbuch beim Start des Hosts in Application.Resources
+         gemischt wird (App.xaml.cs, MergePluginResources) — auch wenn die Assembly
+         erst zur Laufzeit aus Plugins/ geladen wurde.
+    -->
+    <DataTemplate DataType="{x:Type local:SampleDocumentViewModel}">
+        <StackPanel Margin="24">
+            <TextBlock Text="Beispiel-Plugin geladen"
+                       FontSize="20" FontWeight="SemiBold"
+                       Foreground="{DynamicResource AppTextPrimaryBrush}" />
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,12,0,0"
+                       Foreground="{DynamicResource AppTextSecondaryBrush}" />
+            <TextBlock Margin="0,12,0,0" Foreground="{DynamicResource AppTextPrimaryBrush}">
+                <Run Text="Ribbon-Befehl ausgeloest:" />
+                <!-- Mode=OneWay noetig: Run.Text bindet sonst TwoWay und scheitert an
+                     der nur lesbaren Eigenschaft (siehe Docs/status/P0-spike.md). -->
+                <Run Text="{Binding ClickCount, Mode=OneWay}" FontWeight="Bold" />
+                <Run Text="mal" />
+            </TextBlock>
+        </StackPanel>
+    </DataTemplate>
+
+    <!--
+      2. Eigenes Icon des Plugins: ein Plugin kann Grafiken mitbringen, ohne auf den
+         Bestand des Hosts angewiesen zu sein.
+    -->
+    <DrawingImage x:Key="Sample.Icon.Own">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#B03A2B"
+                                 Geometry="M8,1 L10,6 L15,6 L11,9.5 L12.5,15 L8,11.5 L3.5,15 L5,9.5 L1,6 L6,6 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!--
+      3. Kontextbezogener Ribbon-Tab des Plugins. Als fertiger RibbonTabItem, damit
+         die volle XAML-Ausdruckskraft erhalten bleibt (Bindungen, DropDownButtons,
+         Icons) — statt dass der Host Oberflaeche aus Deskriptoren zusammenbaut. Die
+         Anbindung an die kontextuelle Gruppe und deren Sichtbarkeit setzt der Host
+         (eine ElementName-Bindung ins Hauptfenster traegt aus einem separat
+         geladenen Woerterbuch heraus nicht).
+
+         x:Shared="False": das Woerterbuch koennte mehrfach geladen werden; ein
+         RibbonTabItem darf aber nur einen Elternteil haben.
+    -->
+    <Fluent:RibbonTabItem x:Key="SampleRibbonTab" x:Shared="False" Header="Beispiel">
+        <Fluent:RibbonGroupBox Header="Probe">
+            <!--
+              Icon aus dem HOST. Bewusst DynamicResource: StaticResource wuerde beim
+              Laden dieses Woerterbuchs aufgeloest, und da ist es noch nicht in
+              Application.Resources gemischt — der Schluessel waere unbekannt.
+            -->
+            <Fluent:Button Header="Ping" Icon="{DynamicResource Icon.Database}"
+                           Command="{Binding ActiveDocument.PingCommand}"
+                           ToolTip="Zaehlt im Dokument des Plugins hoch (prueft Command-Bindung und Host-Icon)" />
+            <!-- Icon aus dem PLUGIN selbst (gleiches Woerterbuch, StaticResource genuegt). -->
+            <Fluent:Button Header="Eigenes Icon" Icon="{StaticResource Sample.Icon.Own}"
+                           Command="{Binding ActiveDocument.PingCommand}"
+                           ToolTip="Prueft ein Icon, das das Plugin selbst mitbringt" />
+            <Fluent:DropDownButton Header="Menue" Icon="{DynamicResource Icon.Property}">
+                <Fluent:Button Header="Auch Ping" Icon="{DynamicResource Icon.Refresh}"
+                               Command="{Binding ActiveDocument.PingCommand}" />
+            </Fluent:DropDownButton>
+        </Fluent:RibbonGroupBox>
+    </Fluent:RibbonTabItem>
+
+</ResourceDictionary>

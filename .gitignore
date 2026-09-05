@@ -1,0 +1,29 @@
+# Build-Ausgaben
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.userprefs
+
+# NuGet
+*.nupkg
+packages/
+
+# Test-Ergebnisse
+[Tt]est[Rr]esult*/
+*.trx
+
+# Claude Code (temporäre Agent-Worktrees etc.)
+.claude/worktrees/
+
+# Referenzmaterial, nicht Teil des Repos (Alex' lokale Screenshots)
+/Docs/CMIS Workbench Screenshots/
+
+# Zur Laufzeit hierhin kopierte Plugins (Build-Ausgabe, nicht versioniert)
+/src/CMISPilot.Desktop/bin/*/*/Plugins/

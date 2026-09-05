@@ -1,0 +1,940 @@
+<shell:ShellRibbonWindow x:Class="CMISPilot.Desktop.MainWindow"
+                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                     xmlns:Fluent="urn:fluent-ribbon"
+                     xmlns:shell="clr-namespace:APX.Wpf.Shell;assembly=APX.Wpf.Shell"
+                     xmlns:docking="clr-namespace:APX.Wpf.Shell.Docking;assembly=APX.Wpf.Shell"
+                     xmlns:conv="clr-namespace:CMISPilot.Desktop.Converters"
+                     xmlns:apxconv="clr-namespace:APX.Wpf.Shell.Converters;assembly=APX.Wpf.Shell"
+                     xmlns:log="clr-namespace:APX.Wpf.Shell.ViewModels.Logging;assembly=APX.Wpf.Shell.ViewModels"
+                     xmlns:expl="clr-namespace:CMISPilot.ViewModels.Explorer;assembly=CMISPilot.ViewModels"
+                     xmlns:qry="clr-namespace:CMISPilot.ViewModels.Query;assembly=CMISPilot.ViewModels"
+                     xmlns:typ="clr-namespace:CMISPilot.ViewModels.Types;assembly=CMISPilot.ViewModels"
+                     xmlns:repo="clr-namespace:CMISPilot.ViewModels.Repository;assembly=CMISPilot.ViewModels"
+                     xmlns:diag="clr-namespace:CMISPilot.ViewModels.Diagnostics;assembly=CMISPilot.ViewModels"
+                     xmlns:ed="clr-namespace:CMISPilot.Desktop.Editor"
+                     mc:Ignorable="d"
+                     Title="CMISPilot"
+                     Icon="/Resources/CMISPilot.ico"
+                     Width="1160" Height="740" MinWidth="860" MinHeight="540"
+                     WindowStartupLocation="CenterScreen">
+
+    <Fluent:RibbonWindow.Resources>
+        <conv:BoolToGridLengthConverter x:Key="BoolToGridLength" />
+        <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+        <conv:InverseBoolConverter x:Key="InverseBool" />
+        <conv:TreeNodeKindToIconConverter x:Key="TreeNodeKindToIcon" />
+        <conv:FileIconConverter x:Key="FileIconConv" />
+        <!-- S6.4: Fassung aus der Library statt der lokalen. -->
+        <apxconv:StringEqualsToVisibilityConverter x:Key="StringEqualsToVis" />
+        <conv:StringToVisibilityConverter x:Key="StringToVis" />
+        <conv:AuthenticationTypeLabelConverter x:Key="AuthLabel" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <!-- R3: Ebene -> Statussymbol in Ausgabe/Fehlerliste. -->
+        <conv:LogLevelToIconConverter x:Key="LogLevelToIcon" />
+
+        <!-- Verbindungsampel in der Statusleiste: gruen = verbunden, rot = nicht. -->
+        <Style x:Key="ConnectionStatusDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Stroke" Value="#40000000" />
+            <Setter Property="StrokeThickness" Value="0.5" />
+            <Setter Property="Fill" Value="{DynamicResource AppErrorBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Connection.IsConnected}" Value="True">
+                    <Setter Property="Fill" Value="{DynamicResource AppSuccessBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Gemeinsamer Stil der drei Name/Wert-Tabellen im Repository-Info-Tab.
+             Vertikal kein eigenes Scrollen: die Tabellen liegen in einem gemeinsamen
+             ScrollViewer und sollen ihre volle Hoehe einnehmen, sonst bekaeme man
+             drei Bildlaufleisten in einer scrollenden Seite.
+
+             Horizontal dagegen "Auto": mit Disabled kann die Tabelle nicht breiter
+             werden als ihr Sichtbereich, und damit laesst sich auch keine Spalte
+             breiter ziehen - der Platz muesste ja irgendwoher kommen. Feste
+             Pixelbreiten statt "*" aus demselben Grund. Die Seite selbst scrollt
+             deshalb nur vertikal, den Ueberhang faengt die jeweilige Tabelle ab. -->
+        <Style x:Key="RepositoryInfoGridStyle" TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="IsReadOnly" Value="False" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="ClipboardCopyMode" Value="IncludeHeader" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        </Style>
+
+        <!-- Server-Baum (R4 Etappe 2): Server → Repository → Ordner, Lazy-Load. -->
+        <HierarchicalDataTemplate DataType="{x:Type expl:TreeNodeViewModel}" ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal" Margin="0,2">
+                <Image Width="16" Height="16" Margin="0,0,6,0"
+                       Source="{Binding Kind, Converter={StaticResource TreeNodeKindToIcon}}"
+                       Visibility="{Binding IsPlaceholder, Converter={StaticResource InverseBoolToVis}}" />
+                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+            </StackPanel>
+        </HierarchicalDataTemplate>
+
+        <DataTemplate DataType="{x:Type expl:ServerTreeViewModel}">
+            <TreeView ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0"
+                      Foreground="{DynamicResource AppTextPrimaryBrush}"
+                      SelectedItemChanged="OnServerTreeSelectedItemChanged"
+                      MouseDoubleClick="OnServerTreeMouseDoubleClick">
+                <TreeView.ItemContainerStyle>
+                    <Style TargetType="TreeViewItem">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+                        <!-- Klick auf einen bereits selektierten Ordnerknoten oeffnet den
+                             Explorer erneut, falls keiner mehr offen ist (SelectedItemChanged
+                             feuert dann nicht). -->
+                        <EventSetter Event="PreviewMouseLeftButtonUp" Handler="OnServerTreeItemClick" />
+                    </Style>
+                </TreeView.ItemContainerStyle>
+            </TreeView>
+        </DataTemplate>
+
+        <!-- Eigenschaften-Werkzeugfenster (R4 Etappe 3): folgt der Baum-/Listenauswahl. -->
+        <DataTemplate DataType="{x:Type expl:PropertiesViewModel}">
+            <!-- Feste Startbreiten statt "*", damit sich die Spalten mit der Maus
+                 ziehen lassen: bei "*" verteilen sich die Spalten nur untereinander,
+                 und da die Summe der MinWidth (540px) das schmale Standard-Pane
+                 (280px, DockingHost.CreateDefaultLayout) uebersteigt, haengt jede
+                 Spalte an ihrer Untergrenze - ein Ziehen bewirkt dann nichts. Mit
+                 Pixelbreiten waechst stattdessen die Gesamtbreite und der horizontale
+                 Scrollbalken faengt den Ueberhang ab (S8.4). MinWidth bleibt als
+                 Untergrenze fuers Ziehen, aber klein genug, um schmal zu ziehen. -->
+            <!-- Beide Bildlaufleisten bewusst "Auto": die vertikale Leiste
+                 (DataGrid-Standard waere "Visible") wuerde im schmalen Pane sonst
+                 dauerhaft Breite belegen, auch wenn alle Zeilen sichtbar sind. -->
+            <!-- IsReadOnly bewusst False: die Zellen sollen in den Bearbeitungsmodus
+                 wechseln koennen, damit sich ein Teilstring eines Werts markieren und
+                 kopieren laesst (TextBlock im Anzeigemodus erlaubt keine Textauswahl).
+                 PropertyRowViewModel ist ein reines Anzeige-Record, ein Commit landet
+                 nirgends - keine echte Aenderung moeglich. -->
+            <DockPanel>
+                <!-- Filterbereich unten: Suchfeld und je Spalte ein Haken, ob sie
+                     mitgefiltert wird. WrapPanel statt StackPanel, weil die drei
+                     deutschen Beschriftungen im schmalen Standard-Pane (280px) nicht
+                     nebeneinander passen und dann umbrechen sollen. -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="4,6,4,4">
+                    <DockPanel>
+                        <TextBlock Text="Filter" DockPanel.Dock="Left" VerticalAlignment="Center"
+                                   Margin="0,0,8,0" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                        <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Filtert die Eigenschaften über die angehakten Spalten" />
+                    </DockPanel>
+                    <WrapPanel Margin="0,4,0,0">
+                        <CheckBox Content="Displayname" Margin="0,2,12,0"
+                                  IsChecked="{Binding FilterByDisplayName}"
+                                  Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                        <CheckBox Content="PropertyID" Margin="0,2,12,0"
+                                  IsChecked="{Binding FilterByPropertyId}"
+                                  Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                        <CheckBox Content="Wert" Margin="0,2,0,0"
+                                  IsChecked="{Binding FilterByValue}"
+                                  Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                    </WrapPanel>
+                </StackPanel>
+
+                <DataGrid ItemsSource="{Binding VisibleProperties}" AutoGenerateColumns="False"
+                      IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                      ClipboardCopyMode="IncludeHeader"
+                      PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                      Foreground="{DynamicResource AppTextPrimaryBrush}">
+                <!-- F3-Erweiterung: Eigenschaften des inspizierten Objekts als Excel
+                     exportieren. DataContext muss ueber PlacementTarget erneut auf das
+                     PropertiesViewModel gebunden werden (ContextMenu haengt nicht im
+                     visuellen Baum seines Ziels). -->
+                <DataGrid.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="Nach Excel exportieren" Command="{Binding ExportCommand}">
+                            <MenuItem.Icon><Image Source="{StaticResource Icon.ExcelExport}" Width="16" Height="16" /></MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Displayname" Binding="{Binding DisplayName}" Width="180" MinWidth="40" />
+                    <DataGridTextColumn Header="PropertyID" Binding="{Binding PropertyId}" Width="160" MinWidth="40" />
+                    <DataGridTextColumn Header="Typ" Binding="{Binding OwningTypeId}" Width="90" MinWidth="40" />
+                    <DataGridTextColumn Header="Datentyp" Binding="{Binding DataType}" Width="100" MinWidth="40" />
+                    <DataGridTextColumn Header="Pflichtfeld" Binding="{Binding IsRequired}" Width="90" MinWidth="40" />
+                    <DataGridTextColumn Header="Wert" Binding="{Binding Value}" Width="220" MinWidth="40" />
+                </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </DataTemplate>
+
+        <!-- Explorer-Dokument-Tab (R4 Etappe 3): Breadcrumb + Objektliste des Ordners. -->
+        <DataTemplate DataType="{x:Type expl:ExplorerDocumentViewModel}">
+            <DockPanel Margin="12">
+                <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding PathSegments}" Margin="0,0,0,8">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                                <TextBlock Text=" / " Foreground="{DynamicResource AppTextPrimaryBrush}" Opacity="0.6" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- F6: DataGrid statt ListView/GridView, da GridView keine
+                     Spaltensortierung per Header-Klick unterstuetzt. F7: zusaetzlich
+                     die Spalten "Angelegt am"/"Geaendert am" (CmisObjectDto liefert
+                     beide Werte bereits). -->
+                <DataGrid ItemsSource="{Binding Objects}" SelectedItem="{Binding SelectedObject, Mode=TwoWay}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                          ClipboardCopyMode="IncludeHeader"
+                          AllowDrop="True"
+                          Foreground="{DynamicResource AppTextPrimaryBrush}"
+                          MouseDoubleClick="OnExplorerObjectDoubleClick"
+                          PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                          PreviewKeyDown="OnExplorerGridPreviewKeyDown"
+                          PreviewDragOver="OnExplorerGridPreviewDragOver"
+                          Drop="OnExplorerGridDrop">
+                    <!-- Dieselben Befehle wie im kontextbezogenen Explorer-Ribbon (R6.1),
+                         hier zusaetzlich als Kontextmenü. DataContext muss ueber
+                         PlacementTarget erneut auf den Dokument-Tab gebunden werden, weil
+                         ein ContextMenu nicht im visuellen Baum seines Ziels haengt. -->
+                    <DataGrid.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="Umbenennen" Command="{Binding RenameCommand}">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.Rename}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Bearbeiten" Command="{Binding EditCommand}">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.Edit}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Löschen" Command="{Binding DeleteCommand}">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.Delete}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="Herunterladen" Command="{Binding DownloadCommand}">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.Download}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Öffnen" Command="{Binding OpenCommand}">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.Open}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Inhalt setzen" Command="{Binding SetContentCommand}">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.Upload}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="Name" Width="360" SortMemberPath="Name">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <!-- Ordner: festes Icon.FolderClosed. Dokumente: das von Windows
+                                             der Dateiendung zugeordnete Symbol (praktisch wie der
+                                             Windows-Explorer selbst), sonst Icon.Document als Rueckfall
+                                             (siehe FileIconConverter). -->
+                                        <Image Width="16" Height="16" Margin="0,0,6,0"
+                                               Source="{Binding Converter={StaticResource FileIconConv}}" />
+                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Typ" Binding="{Binding TypeId}" Width="160" />
+                        <DataGridTextColumn Header="Angelegt am" Binding="{Binding CreationDate, StringFormat=g}" Width="150" />
+                        <DataGridTextColumn Header="Geändert am" Binding="{Binding LastModificationDate, StringFormat=g}" Width="150" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </DataTemplate>
+
+        <!-- Abfrage-Dokument-Tab (Query Browser): CMISQL-Editor (Syntaxhervorhebung
+             ueber CmisqlEditor) + darunter Ergebnis/Meldungen als eigener Tabstrip
+             (SSMS-Muster). Die Ergebnisspalten werden im Code-Behind anhand von
+             ColumnNames aufgebaut (siehe OnQueryResultGridLoaded), da das
+             ViewModel WPF-frei bleibt (NFA-03). -->
+        <DataTemplate DataType="{x:Type qry:QueryDocumentViewModel}">
+            <Grid Margin="12">
+                <!-- F5 fuehrt die Abfrage aus (wie im Ribbon „Ausführen"), solange der
+                     Fokus irgendwo im Abfrage-Tab liegt. -->
+                <Grid.InputBindings>
+                    <KeyBinding Key="F5" Command="{Binding ExecuteQueryCommand}" />
+                </Grid.InputBindings>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="200" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <ed:CmisqlEditor Grid.Row="0" SourceText="{Binding CmisqlText}" Margin="0,0,0,8" />
+
+                <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedResultTabIndex}">
+                    <TabItem Header="Ergebnis">
+                        <Grid Margin="8">
+                            <TextBlock Text="Noch kein Ergebnis. CMISQL-Abfrage eingeben und F5 drücken (oder im Ribbon „Ausführen”)."
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6"
+                                       TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center"
+                                       Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVis}}" />
+
+                            <!-- IsReadOnly bewusst False: Zellen sollen sich zum Kopieren
+                                 eines Teilstrings in den Bearbeitungsmodus versetzen lassen.
+                                 Die Spaltenbindung ist OneWay (RebuildQueryResultColumns) -
+                                 ein Commit schreibt nirgends etwas zurueck. -->
+                            <DataGrid x:Name="QueryResultGrid" ItemsSource="{Binding Rows}"
+                                      AutoGenerateColumns="False" IsReadOnly="False"
+                                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                      CanUserAddRows="False" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto"
+                                      ClipboardCopyMode="IncludeHeader"
+                                      PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                                      Foreground="{DynamicResource AppTextPrimaryBrush}"
+                                      Loaded="OnQueryResultGridLoaded"
+                                      Sorting="OnQueryResultGridSorting"
+                                      Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                                        </MenuItem>
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                            </DataGrid>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="Meldungen">
+                        <ListBox ItemsSource="{Binding Messages}" Margin="8"
+                                 Foreground="{DynamicResource AppTextPrimaryBrush}"
+                                 FontFamily="Consolas" HorizontalContentAlignment="Stretch"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                    </TabItem>
+                </TabControl>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Repository-Info-Dokument-Tab (FA-10/FA-11): Eckdaten oben, darunter
+             Capabilities und ACL-Capabilities als Name/Wert-Tabellen. Alles in einem
+             ScrollViewer, weil die Anzahl der Zeilen stark vom Server abhaengt. -->
+        <DataTemplate DataType="{x:Type repo:RepositoryInfoDocumentViewModel}">
+            <Grid Margin="12">
+                <TextBlock Text="Keine Verbindung. Verbinde dich mit einem Repository, um dessen Informationen zu sehen."
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6"
+                           TextWrapping="Wrap" MaxWidth="360" TextAlignment="Center"
+                           Visibility="{Binding HasData, Converter={StaticResource InverseBoolToVis}}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              Visibility="{Binding HasData, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding RepositoryTitle}" FontSize="18" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" Margin="0,0,0,12"
+                                   Foreground="{DynamicResource AppTextPrimaryBrush}" />
+
+                        <TextBlock Text="Eckdaten" FontWeight="SemiBold" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                        <DataGrid ItemsSource="{Binding GeneralRows}" Style="{StaticResource RepositoryInfoGridStyle}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Name}" Width="260" MinWidth="40" />
+                                <DataGridTextColumn Header="Wert" Binding="{Binding Value}" Width="420" MinWidth="40" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Text="Capabilities" FontWeight="SemiBold" Margin="0,16,0,4"
+                                   Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                        <DataGrid ItemsSource="{Binding CapabilityRows}" Style="{StaticResource RepositoryInfoGridStyle}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Name}" Width="260" MinWidth="40" />
+                                <DataGridTextColumn Header="Wert" Binding="{Binding Value}" Width="420" MinWidth="40" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Text="ACL-Capabilities" FontWeight="SemiBold" Margin="0,16,0,4"
+                                   Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                        <DataGrid ItemsSource="{Binding AclRows}" Style="{StaticResource RepositoryInfoGridStyle}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Bezeichnung" Binding="{Binding Name}" Width="260" MinWidth="40" />
+                                <DataGridTextColumn Header="Wert" Binding="{Binding Value}" Width="420" MinWidth="40" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Typen-Dokument-Tab (R5.2): Typbaum (links) + Attribute/Property-
+             Definitionen des selektierten Typs (rechts). TreeView.SelectedItem ist
+             nicht bindbar, daher OnTypesTreeSelectedItemChanged (analog Server-Baum,
+             R4 Etappe 2). -->
+        <DataTemplate DataType="{x:Type typ:TypesDocumentViewModel}">
+            <Grid Margin="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="320" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource GrayBrush8}"
+                        Padding="0,0,8,0">
+                    <Grid>
+                        <TextBlock Text="Noch keine Typen geladen. Im Ribbon „Typen laden” klicken."
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6"
+                                   TextWrapping="Wrap" MaxWidth="240" TextAlignment="Center"
+                                   Visibility="{Binding HasTypes, Converter={StaticResource InverseBoolToVis}}" />
+
+                        <TreeView x:Name="TypesTree" ItemsSource="{Binding RootTypes}"
+                                  Background="Transparent" BorderThickness="0"
+                                  Foreground="{DynamicResource AppTextPrimaryBrush}"
+                                  SelectedItemChanged="OnTypesTreeSelectedItemChanged"
+                                  Visibility="{Binding HasTypes, Converter={StaticResource BoolToVis}}">
+                            <TreeView.ItemContainerStyle>
+                                <Style TargetType="TreeViewItem">
+                                    <Setter Property="IsExpanded" Value="True" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+                                </Style>
+                            </TreeView.ItemContainerStyle>
+                            <TreeView.ItemTemplate>
+                                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                    <StackPanel Orientation="Horizontal" Margin="0,2">
+                                        <Image Width="16" Height="16" Margin="0,0,6,0"
+                                               Source="{StaticResource Icon.Tag}" />
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                                        <TextBlock Text="{Binding Id, StringFormat=' ({0})'}" Opacity="0.6"
+                                                   Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                                    </StackPanel>
+                                </HierarchicalDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock Text="Einen Typ im Baum auswählen, um Attribute und Property-Definitionen zu sehen."
+                               HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6"
+                               TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center"
+                               Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolToVis}}" />
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                        <StackPanel DataContext="{Binding SelectedType}">
+                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="16"
+                                       Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Opacity="0.7"
+                                       Foreground="{DynamicResource AppTextPrimaryBrush}" Margin="0,2,0,12" />
+
+                            <TextBlock Text="Typ-Attribute" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppTextPrimaryBrush}" Margin="0,0,0,6" />
+                            <ItemsControl Margin="0,0,0,12">
+                                <ItemsControl.Resources>
+                                    <Style x:Key="AttrLabel" TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+                                        <Setter Property="Opacity" Value="0.6" />
+                                        <Setter Property="Width" Value="180" />
+                                    </Style>
+                                    <Style x:Key="AttrValue" TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+                                    </Style>
+                                </ItemsControl.Resources>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="ID" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding Id}" Style="{StaticResource AttrValue}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Query-Name" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding QueryName}" Style="{StaticResource AttrValue}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Basistyp" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding BaseType}" Style="{StaticResource AttrValue}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Übergeordneter Typ" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding ParentTypeId}" Style="{StaticResource AttrValue}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="creatable" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding IsCreatable}" Style="{StaticResource AttrValue}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="fileable" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding IsFileable}" Style="{StaticResource AttrValue}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="queryable" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding IsQueryable}" Style="{StaticResource AttrValue}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="fulltextIndexed" Style="{StaticResource AttrLabel}" />
+                                    <TextBlock Text="{Binding IsFulltextIndexed}" Style="{StaticResource AttrValue}" />
+                                </StackPanel>
+                            </ItemsControl>
+
+                            <TextBlock Text="Property-Definitionen" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppTextPrimaryBrush}" Margin="0,0,0,6" />
+                            <DataGrid ItemsSource="{Binding PropertyDefinitions}" AutoGenerateColumns="False"
+                                      IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                                      GridLinesVisibility="Horizontal" HorizontalScrollBarVisibility="Auto"
+                                      ClipboardCopyMode="IncludeHeader"
+                                      PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                                      Foreground="{DynamicResource AppTextPrimaryBrush}">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                                        </MenuItem>
+                                        <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                                        </MenuItem>
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" />
+                                    <DataGridTextColumn Header="Anzeigename" Binding="{Binding DisplayName}" />
+                                    <DataGridTextColumn Header="Datentyp" Binding="{Binding PropertyType}" />
+                                    <DataGridTextColumn Header="Kardinalität" Binding="{Binding Cardinality}" />
+                                    <DataGridCheckBoxColumn Header="required" Binding="{Binding IsRequired}" />
+                                    <DataGridCheckBoxColumn Header="queryable" Binding="{Binding IsQueryable}" />
+                                    <DataGridCheckBoxColumn Header="orderable" Binding="{Binding IsOrderable}" />
+                                    <DataGridTextColumn Header="Änderbarkeit" Binding="{Binding Updatability}" />
+                                    <DataGridCheckBoxColumn Header="inherited" Binding="{Binding IsInherited}" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Ausgabe (R3): roher Log-Strom aller Ebenen -->
+        <DataTemplate DataType="{x:Type log:OutputToolViewModel}">
+            <DataGrid ItemsSource="{Binding Entries}" AutoGenerateColumns="False"
+                      IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      ClipboardCopyMode="IncludeHeader"
+                      PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                      Foreground="{DynamicResource AppTextPrimaryBrush}">
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Zeit" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="80" />
+                    <!-- R3: Ebene mit Statussymbol (Visual-Studio-Stil). SortMemberPath +
+                         ClipboardContentBinding, damit Sortierung und Kopieren erhalten bleiben. -->
+                    <DataGridTemplateColumn Header="Ebene" Width="110" SortMemberPath="Level"
+                                            CanUserSort="True" ClipboardContentBinding="{Binding Level}">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image Width="16" Height="16" Margin="0,0,6,0"
+                                           Source="{Binding Level, Converter={StaticResource LogLevelToIcon}}" />
+                                    <TextBlock Text="{Binding Level}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Meldung" Binding="{Binding Message}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DataTemplate>
+
+        <!-- Fehlerliste (R3): gefiltert auf Warnung/Fehler -->
+        <DataTemplate DataType="{x:Type log:ErrorListToolViewModel}">
+            <DataGrid ItemsSource="{Binding Entries}" AutoGenerateColumns="False"
+                      IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      ClipboardCopyMode="IncludeHeader"
+                      PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                      Foreground="{DynamicResource AppTextPrimaryBrush}">
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                            <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                        </MenuItem>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Zeit" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="80" />
+                    <!-- R3: Ebene mit Statussymbol (Visual-Studio-Stil). SortMemberPath +
+                         ClipboardContentBinding, damit Sortierung und Kopieren erhalten bleiben. -->
+                    <DataGridTemplateColumn Header="Ebene" Width="110" SortMemberPath="Level"
+                                            CanUserSort="True" ClipboardContentBinding="{Binding Level}">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image Width="16" Height="16" Margin="0,0,6,0"
+                                           Source="{Binding Level, Converter={StaticResource LogLevelToIcon}}" />
+                                    <TextBlock Text="{Binding Level}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Meldung" Binding="{Binding Message}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DataTemplate>
+
+        <!-- Diagnose (R5.3): Serveroperationen (Kategorie "Executor") und HTTP-Roh-
+             Protokoll (Kategorie "HTTP") des Browser Bindings, FA-80. Ersetzt den
+             R1-Platzhalter „Konsole" im unteren Andockbereich. -->
+        <DataTemplate DataType="{x:Type diag:DiagnosticsToolViewModel}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4">
+                    <Button Content="Aktualisieren" Margin="0,0,8,0" Padding="6,2"
+                            Command="{Binding RefreshEntriesCommand}" ToolTip="Protokoll neu laden" />
+                    <Button Content="Leeren" Padding="6,2"
+                            Command="{Binding ClearEntriesCommand}" ToolTip="Protokoll leeren" />
+                </StackPanel>
+                <DataGrid ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
+                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                          CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          ClipboardCopyMode="IncludeHeader"
+                          PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                          Foreground="{DynamicResource AppTextPrimaryBrush}">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Zeit" Binding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="100" />
+                        <DataGridTextColumn Header="Kategorie" Binding="{Binding Category}" Width="90" />
+                        <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="*" />
+                        <DataGridTextColumn Header="Dauer (ms)" Binding="{Binding Duration.TotalMilliseconds, StringFormat='F0'}" Width="90" />
+                        <DataGridTextColumn Header="Ergebnis" Binding="{Binding Result}" Width="90" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </DataTemplate>
+    </Fluent:RibbonWindow.Resources>
+
+    <DockPanel>
+
+        <!-- ============ Ribbon (R1.3) ============ -->
+        <Fluent:Ribbon x:Name="MainRibbon" DockPanel.Dock="Top">
+
+            <!-- R4 Etappe 4: kontextuelle Tab-Gruppe fürs Explorer-Ribbon. Nur sichtbar,
+                 solange der aktive Dokument-Tab ein ExplorerDocumentViewModel ist
+                 (ActiveContextTabKey == "explorer"). -->
+            <!-- Kontextuelle Tab-Gruppen mit Office-typischer Akzentfarbe (farbiger
+                 Streifen ueber der Gruppe + getoenter Tab): Background faerbt den
+                 Kopfstreifen, BorderBrush die Trennlinie. Bewusst kraeftige, in Hell
+                 und Dunkel gut sichtbare Farben je Werkzeuggruppe. -->
+            <Fluent:Ribbon.ContextualGroups>
+                <Fluent:RibbonContextualTabGroup x:Name="ExplorerContextGroup" Header="Explorer-Werkzeuge"
+                                                  Background="#D9730D" BorderBrush="#D9730D"
+                                                  Visibility="{Binding ActiveContextTabKey,
+                                                               Converter={StaticResource StringEqualsToVis},
+                                                               ConverterParameter=explorer}" />
+                <!-- R5.1: kontextuelle Tab-Gruppe fürs Abfrage-Ribbon. -->
+                <Fluent:RibbonContextualTabGroup x:Name="QueryContextGroup" Header="Abfrage-Werkzeuge"
+                                                  Background="#217346" BorderBrush="#217346"
+                                                  Visibility="{Binding ActiveContextTabKey,
+                                                               Converter={StaticResource StringEqualsToVis},
+                                                               ConverterParameter=query}" />
+                <!-- R5.2: kontextuelle Tab-Gruppe fürs Typen-Ribbon. -->
+                <Fluent:RibbonContextualTabGroup x:Name="TypesContextGroup" Header="Typen-Werkzeuge"
+                                                  Background="#7B2A9D" BorderBrush="#7B2A9D"
+                                                  Visibility="{Binding ActiveContextTabKey,
+                                                               Converter={StaticResource StringEqualsToVis},
+                                                               ConverterParameter=types}" />
+                <!-- Kontextuelle Tab-Gruppe fuer das Repository-Info-Ribbon (FA-10/FA-11). -->
+                <Fluent:RibbonContextualTabGroup x:Name="RepositoryInfoContextGroup" Header="Repository-Werkzeuge"
+                                                  Background="#1F7A5A" BorderBrush="#1F7A5A"
+                                                  Visibility="{Binding ActiveContextTabKey,
+                                                               Converter={StaticResource StringEqualsToVis},
+                                                               ConverterParameter=repository-info}" />
+            </Fluent:Ribbon.ContextualGroups>
+
+            <!-- Backstage-Rumpf (Datei-Menü). Die Profilverwaltung ist in den
+                 Verbinden-Dialog gewandert (ConnectDialog/ConnectDialogViewModel);
+                 es gibt hier keinen eigenen "Profile"-Tab mehr.
+                 R6.4: „Über CMISPilot" als Backstage-Button (öffnet AboutWindow). -->
+            <Fluent:Ribbon.Menu>
+                <Fluent:Backstage>
+                    <Fluent:BackstageTabControl>
+                        <Fluent:BackstageTabItem Header="Info">
+                            <TextBlock Margin="24" TextWrapping="Wrap"
+                                       Text="CMISPilot – neue Werkbank (Redesign)." />
+                        </Fluent:BackstageTabItem>
+
+                        <Fluent:Button Header="Über CMISPilot" Icon="{StaticResource Icon.About}" Click="OnAboutClick" />
+                        <Fluent:Button Header="Beenden" Icon="{StaticResource Icon.Exit}" Click="OnExitClick" />
+                    </Fluent:BackstageTabControl>
+                </Fluent:Backstage>
+            </Fluent:Ribbon.Menu>
+
+            <!-- Standard-Tab: Start -->
+            <Fluent:RibbonTabItem x:Name="StartRibbonTab" Header="Start">
+                <Fluent:RibbonGroupBox Header="Verbindung">
+                    <!-- R6.3: SplitButton statt einfachem Button – Klick auf den
+                         Hauptteil öffnet weiterhin den Verbinden-Dialog (OnConnectClick);
+                         das Aufklapp-Menü listet die zuletzt gespeicherten Profile zur
+                         Schnellauswahl (befüllt in OnConnectDropDownOpened,
+                         MainWindow.xaml.cs, da ViewModels WPF-frei bleiben, NFA-03). -->
+                    <Fluent:SplitButton x:Name="ConnectSplitButton" Header="Verbinden" Icon="{StaticResource Icon.Connect}"
+                                        Click="OnConnectClick"
+                                        DropDownOpened="OnConnectDropDownOpened"
+                                        IsEnabled="{Binding Connection.IsConnected, Converter={StaticResource InverseBool}}" />
+                    <Fluent:Button Header="Trennen" Icon="{StaticResource Icon.Disconnect}" Click="OnDisconnectClick"
+                                   IsEnabled="{Binding Connection.IsConnected}" />
+                </Fluent:RibbonGroupBox>
+                <!-- R5.1/R5.2: öffnet die singleton Dokument-Tabs "Abfrage"/"Typen"
+                     (feste ContentId, Deduplizierung über WorkspaceViewModel.OpenDocument). -->
+                <Fluent:RibbonGroupBox Header="Werkzeuge">
+                    <Fluent:Button Header="Abfrage" Icon="{StaticResource Icon.QueryView}"
+                                   Click="OnOpenQueryClick" ToolTip="CMISQL-Abfrage-Tab öffnen" />
+                    <Fluent:Button Header="Typen" Icon="{StaticResource Icon.Tag}"
+                                   Click="OnOpenTypesClick" ToolTip="Typen-Tab öffnen" />
+                    <Fluent:Button Header="Repository-Info" Icon="{StaticResource Icon.RepositoryInfo}"
+                                   LargeIcon="{StaticResource Icon.RepositoryInfoLarge}"
+                                   Click="OnOpenRepositoryInfoClick"
+                                   ToolTip="Eckdaten und Capabilities des verbundenen Repositories anzeigen" />
+                </Fluent:RibbonGroupBox>
+                <!-- Schaltflaechen aus Plugins. Bleibt leer und unsichtbar, wenn keine
+                     Plugins geladen sind (Auslieferungsfall). Befuellt in
+                     MainWindow.xaml.cs, ApplyPluginContributions. -->
+                <Fluent:RibbonGroupBox x:Name="PluginToolsGroup" Header="Erweiterungen"
+                                       Visibility="Collapsed" />
+            </Fluent:RibbonTabItem>
+
+            <!-- Standard-Tab: Ansicht (Werkzeugfenster ein-/ausblenden) -->
+            <Fluent:RibbonTabItem Header="Ansicht">
+                <Fluent:RibbonGroupBox Header="Werkzeugfenster">
+                    <!-- S6.3: ein Eintrag je Werkzeugfenster statt drei
+                         Pane-Umschaltern. Aus der Liste erzeugt, damit ein neues
+                         Werkzeug automatisch mitwaechst. Zwei-Wege-Bindung, weil
+                         sich ein Fenster auch ueber sein eigenes Schliesskreuz
+                         zumachen laesst. -->
+                    <ItemsControl ItemsSource="{Binding Tools}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Vertical" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Title}" Margin="2,1"
+                                          IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                          Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Fluent:Button Header="Alle einblenden" Icon="{StaticResource Icon.Output}"
+                                   Command="{Binding ShowAllToolsCommand}"
+                                   ToolTip="Alle Werkzeugfenster wieder einblenden" />
+                </Fluent:RibbonGroupBox>
+
+                <Fluent:RibbonGroupBox Header="Layout">
+                    <Fluent:Button Header="Zurücksetzen" Icon="{StaticResource Icon.Refresh}"
+                                   Click="OnResetLayoutClick"
+                                   ToolTip="Gespeichertes Fensterlayout verwerfen (wirkt beim nächsten Start)" />
+                </Fluent:RibbonGroupBox>
+                <Fluent:RibbonGroupBox Header="Darstellung">
+                    <!-- Die Hell/Dunkel-Umschaltung ist entfallen. Bis auf Weiteres
+                         gibt es genau ein Erscheinungsbild (hell). Ein Umschalter,
+                         der Ribbon und Brushes faerbt, die Docking-Panes aber hell
+                         laesst, waere schlechter als keiner. -->
+                </Fluent:RibbonGroupBox>
+            </Fluent:RibbonTabItem>
+
+            <!-- R4 Etappe 4: kontextuelles Explorer-Ribbon. Nur sichtbar/aktiv, solange
+                 das aktive Dokument ein ExplorerDocumentViewModel ist; die Buttons binden
+                 direkt an dessen CRUD-Kommandos (ActiveDocument wechselt den Typ mit dem
+                 aktiven Tab). -->
+            <Fluent:RibbonTabItem x:Name="ExplorerRibbonTab" Header="Explorer" Group="{Binding ElementName=ExplorerContextGroup}"
+                                  Visibility="{Binding ActiveContextTabKey,
+                                               Converter={StaticResource StringEqualsToVis},
+                                               ConverterParameter=explorer}">
+                <Fluent:RibbonGroupBox Header="Anlegen">
+                    <Fluent:Button Header="Neuer Ordner" Icon="{StaticResource Icon.NewFolder}"
+                                   Command="{Binding ActiveDocument.NewFolderCommand}" />
+                    <Fluent:Button Header="Neues Dokument" Icon="{StaticResource Icon.NewDocument}"
+                                   Command="{Binding ActiveDocument.NewDocumentCommand}" />
+                </Fluent:RibbonGroupBox>
+                <Fluent:RibbonGroupBox Header="Bearbeiten">
+                    <Fluent:Button Header="Bearbeiten" Icon="{StaticResource Icon.Edit}"
+                                   Command="{Binding ActiveDocument.EditCommand}" />
+                    <Fluent:Button Header="Löschen" Icon="{StaticResource Icon.Delete}"
+                                   Command="{Binding ActiveDocument.DeleteCommand}" />
+                </Fluent:RibbonGroupBox>
+                <Fluent:RibbonGroupBox Header="Inhalte">
+                    <Fluent:Button Header="Herunterladen" Icon="{StaticResource Icon.Download}"
+                                   Command="{Binding ActiveDocument.DownloadCommand}" />
+                    <Fluent:Button Header="Öffnen" Icon="{StaticResource Icon.Open}"
+                                   Command="{Binding ActiveDocument.OpenCommand}" />
+                    <Fluent:Button Header="Inhalt setzen" Icon="{StaticResource Icon.Upload}"
+                                   Command="{Binding ActiveDocument.SetContentCommand}" />
+                </Fluent:RibbonGroupBox>
+                <!-- R6.1: öffnet ExtendedPropertiesWindow für das selektierte Objekt
+                     (nicht über ein Command des Dokument-Tabs, da das Fenster ein
+                     eigenständiges WPF-Window ist, siehe MainWindow.xaml.cs). -->
+                <Fluent:RibbonGroupBox Header="Details">
+                    <Fluent:Button Header="Erweiterte Eigenschaften" Icon="{StaticResource Icon.PropertiesDetail}"
+                                   Click="OnExtendedPropertiesClick"
+                                   ToolTip="Alle Properties, Typdefinition/Vererbung, Allowable Actions, ACL und Versionsreihe des gewählten Objekts anzeigen" />
+                </Fluent:RibbonGroupBox>
+                <!-- F3: Objektliste des Ordners als Excel exportieren. -->
+                <Fluent:RibbonGroupBox Header="Export">
+                    <Fluent:Button Header="Nach Excel" Icon="{StaticResource Icon.ExcelExport}"
+                                   Command="{Binding ActiveDocument.ExportListCommand}"
+                                   ToolTip="Die Objektliste dieses Ordners als Excel-Datei exportieren" />
+                </Fluent:RibbonGroupBox>
+            </Fluent:RibbonTabItem>
+
+            <!-- R5.1: kontextuelles Abfrage-Ribbon. Nur sichtbar/aktiv, solange das
+                 aktive Dokument ein QueryDocumentViewModel ist. -->
+            <Fluent:RibbonTabItem x:Name="QueryRibbonTab" Header="Abfrage" Group="{Binding ElementName=QueryContextGroup}"
+                                  Visibility="{Binding ActiveContextTabKey,
+                                               Converter={StaticResource StringEqualsToVis},
+                                               ConverterParameter=query}">
+                <Fluent:RibbonGroupBox Header="Ausführen">
+                    <Fluent:Button Header="Ausführen" Icon="{StaticResource Icon.Execute}"
+                                   Command="{Binding ActiveDocument.ExecuteQueryCommand}"
+                                   ToolTip="CMISQL-Abfrage ausführen (F5)" />
+                </Fluent:RibbonGroupBox>
+                <!-- Query Browser: Abfrage als .cmisql-Datei laden/speichern. -->
+                <Fluent:RibbonGroupBox Header="Abfrage">
+                    <Fluent:Button Header="Laden" Icon="{StaticResource Icon.QueryLoad}"
+                                   LargeIcon="{StaticResource Icon.QueryLoadLarge}"
+                                   Command="{Binding ActiveDocument.LoadQueryCommand}"
+                                   ToolTip="Abfrage aus einer .cmisql-Datei laden" />
+                    <Fluent:Button Header="Speichern" Icon="{StaticResource Icon.QuerySave}"
+                                   Command="{Binding ActiveDocument.SaveQueryCommand}"
+                                   ToolTip="Abfrage in eine .cmisql-Datei speichern" />
+                </Fluent:RibbonGroupBox>
+                <!-- F3: Ergebnistabelle als Excel exportieren. -->
+                <Fluent:RibbonGroupBox Header="Export">
+                    <Fluent:Button Header="Nach Excel" Icon="{StaticResource Icon.ExcelExport}"
+                                   Command="{Binding ActiveDocument.ExportResultCommand}"
+                                   ToolTip="Das aktuelle Abfrageergebnis als Excel-Datei exportieren" />
+                </Fluent:RibbonGroupBox>
+            </Fluent:RibbonTabItem>
+
+            <!-- R5.2: kontextuelles Typen-Ribbon. Nur sichtbar/aktiv, solange das
+                 aktive Dokument ein TypesDocumentViewModel ist. -->
+            <Fluent:RibbonTabItem x:Name="TypesRibbonTab" Header="Typen" Group="{Binding ElementName=TypesContextGroup}"
+                                  Visibility="{Binding ActiveContextTabKey,
+                                               Converter={StaticResource StringEqualsToVis},
+                                               ConverterParameter=types}">
+                <Fluent:RibbonGroupBox Header="Laden">
+                    <Fluent:Button Header="Typen laden" Icon="{StaticResource Icon.Refresh}"
+                                   Command="{Binding ActiveDocument.LoadTypesCommand}"
+                                   ToolTip="Typbaum laden" />
+                </Fluent:RibbonGroupBox>
+                <!-- F2: gewaehlten Typ als Excel exportieren (Felder, Datentypen, Laengen). -->
+                <Fluent:RibbonGroupBox Header="Export">
+                    <Fluent:Button Header="Nach Excel" Icon="{StaticResource Icon.ExcelExport}"
+                                   Command="{Binding ActiveDocument.ExportSelectedTypeCommand}"
+                                   ToolTip="Den im Baum gewählten Typ als Excel-Datei exportieren (Felder, Datentypen, Längen)" />
+                </Fluent:RibbonGroupBox>
+            </Fluent:RibbonTabItem>
+
+            <!-- Kontextuelles Ribbon des Repository-Info-Tabs (FA-10/FA-11). -->
+            <Fluent:RibbonTabItem x:Name="RepositoryInfoRibbonTab" Header="Repository-Info"
+                                  Group="{Binding ElementName=RepositoryInfoContextGroup}"
+                                  Visibility="{Binding ActiveContextTabKey,
+                                               Converter={StaticResource StringEqualsToVis},
+                                               ConverterParameter=repository-info}">
+                <Fluent:RibbonGroupBox Header="Laden">
+                    <Fluent:Button Header="Aktualisieren" Icon="{StaticResource Icon.Refresh}"
+                                   Command="{Binding ActiveDocument.LoadCommand}"
+                                   ToolTip="Repository-Information erneut vom Server lesen" />
+                </Fluent:RibbonGroupBox>
+                <Fluent:RibbonGroupBox Header="Export">
+                    <Fluent:Button Header="Nach Excel" Icon="{StaticResource Icon.ExcelExport}"
+                                   Command="{Binding ActiveDocument.ExportToExcelCommand}"
+                                   ToolTip="Eckdaten und Capabilities als Excel-Datei speichern" />
+                    <Fluent:Button Header="JSON speichern" Icon="{StaticResource Icon.Download}"
+                                   Command="{Binding ActiveDocument.SaveJsonCommand}"
+                                   ToolTip="Repository-Information als CMIS-JSON speichern (aus den gelesenen Angaben erzeugt, nicht die rohe Serverantwort)" />
+                </Fluent:RibbonGroupBox>
+            </Fluent:RibbonTabItem>
+
+        </Fluent:Ribbon>
+
+        <!-- ============ Statusbar (R1.4) ============ -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Style="{StaticResource ConnectionStatusDot}" />
+                    <TextBlock Text="{Binding Connection.StatusText}" VerticalAlignment="Center"
+                               ToolTip="Verbindungsstatus" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock>
+                    <Run Text="Repository: " />
+                    <Run Text="{Binding Connection.RepositoryName, Mode=OneWay}" />
+                </TextBlock>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock>
+                    <Run Text="Offene Tabs: " />
+                    <Run Text="{Binding Documents.Count, Mode=OneWay}" />
+                </TextBlock>
+            </StatusBarItem>
+            <!-- Unbestimmte Fortschrittsanzeige waehrend Verbinden/Trennen (R1.4). -->
+            <StatusBarItem>
+                <ProgressBar IsIndeterminate="True" Width="120" Height="12"
+                             Visibility="{Binding Connection.IsBusy, Converter={StaticResource BoolToVis}}"
+                             ToolTip="Vorgang läuft…" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="0 Fehler · 0 Warnungen" ToolTip="Log-Zähler (Bindung folgt in R3)" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- ============ Hauptbereich: Docking (S6.2) ============
+             Ersetzt das Grid-und-Splitter-Layout aus R1.2. Der DockingHost bringt
+             Bindung der Dokumente und Werkzeugfenster, Container-Stile,
+             Andockstrategie, Theme und ein Standardlayout mit den drei benannten
+             Bereichen selbst mit; die Inhalte kommen wie bisher ueber die
+             impliziten DataTemplates oben. -->
+        <docking:DockingHost x:Name="DockManager" Workspace="{Binding}" />
+    </DockPanel>
+</shell:ShellRibbonWindow>

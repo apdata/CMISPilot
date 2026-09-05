@@ -1,0 +1,24 @@
+# EditorConfig fuer CMISPilot (nur src/, PortCMIS bleibt unberuehrt)
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,xaml}]
+indent_size = 4
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+# Namespaces im file-scoped Stil (moderne C#-Konvention)
+csharp_style_namespace_declarations = file_scoped:suggestion
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:suggestion

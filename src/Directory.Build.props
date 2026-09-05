@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Gemeinsame Konventionen fuer alle CMISPilot-Projekte (T0.6).
+    Liegt bewusst unter src/, damit PortCMIS (ausserhalb) unberuehrt bleibt:
+    Nullable ist nur in unseren eigenen Projekten aktiv (NFA-03/03a).
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

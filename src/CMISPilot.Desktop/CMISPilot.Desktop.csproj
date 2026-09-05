@@ -1,0 +1,70 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CMISPilot.Desktop</RootNamespace>
+    <AssemblyName>CMISPilot.Desktop</AssemblyName>
+
+    <!-- R6.4: Assembly-Metadaten fuer das "Ueber CMISPilot"-Fenster (AboutViewModel
+         liest sie per Reflection aus dem Einstiegsassembly). -->
+    <Product>CMISPilot</Product>
+    <Version>0.6.0</Version>
+    <Copyright>© 2026 CMISPilot-Projekt</Copyright>
+    <Description>CMISPilot – Werkbank fuer CMIS-Repositories (Browser Binding).</Description>
+
+    <!-- Anwendungssymbol (Taskleiste, Alt-Tab, .exe): Kompass aus der VS Image
+         Library (Compass.xaml), auf den App-Akzent (#0F6CBD) umgefaerbt statt des
+         Bibliotheks-Blaus. Fenster-Titelleiste bindet dasselbe Symbol ueber
+         MainWindow.xaml (Icon). -->
+    <ApplicationIcon>Resources\CMISPilot.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Neue Präsentationsschicht (Redesign): spricht nur die Cmis-Interfaces und
+         die WPF-freien ViewModels an. Nur CMISPilot.Cmis referenziert PortCMIS. -->
+    <ProjectReference Include="..\CMISPilot.ViewModels\CMISPilot.ViewModels.csproj" />
+    <ProjectReference Include="..\CMISPilot.Cmis\CMISPilot.Cmis.csproj" />
+    <!-- Plugin-Vertrag. Der Host kennt nur diesen, nie ein konkretes Plugin. -->
+    <ProjectReference Include="..\CMISPilot.Plugins.Abstractions\CMISPilot.Plugins.Abstractions.csproj" />
+    <!--
+      WPF-Teil der gemeinsamen Shell: DockingHost, ShellRibbonWindow, Theming,
+      Dialoge, Layout-Persistenz. Zurueck auf ProjectReference, Begruendung
+      siehe CMISPilot.ViewModels.csproj.
+    -->
+    <ProjectReference Include="..\..\..\..\APX.Wpf.Shell\WL\src\APX.Wpf.Shell\APX.Wpf.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Als WPF-Resource eingebunden, damit die Titelleiste (MainWindow.xaml, Icon)
+         per pack://-URI darauf zugreifen kann; ApplicationIcon oben deckt nur
+         Taskleiste/.exe ab, nicht das In-Fenster-Icon. -->
+    <Resource Include="Resources\CMISPilot.ico" />
+    <!-- Raster-Icons: die meisten Symbole liegen als Vektor-DrawingImage in
+         Resources/Icons/Icons.xaml. Fuer "Abfrage laden" ist bewusst das
+         FolderOpen-Bitmap aus der VS-Image-Library (2012, WinVista) eingebunden. -->
+    <Resource Include="Resources\Icons\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Syntaxhervorhebung fuer den CMISQL-Editor (CmisqlEditor), zur Laufzeit per
+         Assembly.GetManifestResourceStream geladen (kein pack://-URI noetig). -->
+    <EmbeddedResource Include="Editor\CmisqlHighlighting.xshd" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Fluent.Ribbon" Version="11.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

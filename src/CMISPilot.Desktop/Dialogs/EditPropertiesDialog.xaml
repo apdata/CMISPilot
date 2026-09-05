@@ -1,0 +1,116 @@
+<Window x:Class="CMISPilot.Desktop.Dialogs.EditPropertiesDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:dlg="clr-namespace:CMISPilot.ViewModels.Dialogs;assembly=CMISPilot.ViewModels"
+        xmlns:conv="clr-namespace:CMISPilot.Desktop.Converters"
+        mc:Ignorable="d"
+        Title="{Binding DialogTitle}"
+        Width="480" Height="480" MinWidth="380" MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI" UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        Foreground="{DynamicResource AppTextPrimaryBrush}"
+        Background="{DynamicResource AppSurfaceAltBrush}">
+
+    <Window.Resources>
+        <conv:StringToVisibilityConverter x:Key="StringToVis" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <DataTemplate DataType="{x:Type dlg:EditablePropertyViewModel}">
+            <StackPanel Margin="0,0,0,16">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding DisplayName, Mode=OneWay}"
+                               Style="{DynamicResource AppFieldLabelStyle}" />
+                    <TextBlock Text=" *" Foreground="{DynamicResource AppErrorBrush}"
+                               FontWeight="SemiBold"
+                               Visibility="{Binding IsRequired, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{DynamicResource AppTextBoxStyle}" />
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource AppErrorBrush}"
+                           FontSize="12" Margin="0,3,0,0"
+                           Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVis}}" />
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="{Binding DialogTitle}"
+                   Style="{DynamicResource AppDialogHeadingStyle}" Margin="0,0,0,12" />
+
+        <Border Grid.Row="1" Style="{DynamicResource AppCardStyle}" Padding="18">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- Objekttyp-Auswahl (nur beim Anlegen, FA-71). Ein Wechsel blendet die
+                         Pflichtfelder des gewählten Typs ein. -->
+                    <StackPanel Margin="0,0,0,16"
+                                Visibility="{Binding ShowTypeSelector, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Objekttyp" Style="{DynamicResource AppFieldLabelStyle}" />
+                        <ComboBox HorizontalAlignment="Stretch"
+                                  Style="{DynamicResource AppComboBoxStyle}"
+                                  ItemsSource="{Binding AvailableTypes}"
+                                  SelectedItem="{Binding SelectedType}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                        <TextBlock Text="{Binding Id, StringFormat=' ({0})'}"
+                                                   Foreground="{DynamicResource AppTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{Binding Properties}" />
+
+                    <!-- F1: Datei-Inhalt beim Anlegen. Nur sichtbar, wenn der gewählte Typ auf
+                         cmis:document basiert (gilt damit auch für abgeleitete Dokumenttypen).
+                         Die Datei ist optional: ohne Auswahl wird ein Dokument ohne Inhalt angelegt. -->
+                    <StackPanel Margin="0,0,0,4"
+                                Visibility="{Binding AllowContent, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Datei (optional)" Style="{DynamicResource AppFieldLabelStyle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding ContentFileName, Mode=OneWay}"
+                                     IsReadOnly="True" Style="{DynamicResource AppTextBoxStyle}" />
+                            <Button Grid.Column="1" Content="Durchsuchen…" Padding="12,6" Margin="6,0,0,0"
+                                    Style="{DynamicResource AppSecondaryButtonStyle}"
+                                    Click="OnPickContentFileClick" />
+                            <Button Grid.Column="2" Content="Entfernen" Padding="12,6" Margin="6,0,0,0"
+                                    Style="{DynamicResource AppSecondaryButtonStyle}"
+                                    Click="OnClearContentFileClick"
+                                    Visibility="{Binding HasContentFile, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
+                        <TextBlock Text="{Binding ContentFilePath}" FontSize="11" Margin="0,4,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource AppTextSecondaryBrush}"
+                                   Visibility="{Binding HasContentFile, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Row="2" Margin="0,16,0,0">
+            <Border Height="1" Background="{DynamicResource AppBorderBrush}" Margin="0,0,0,12" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Abbrechen" Margin="0,0,10,0" Padding="18,9" Click="OnCancelClick"
+                        Style="{DynamicResource AppSecondaryButtonStyle}" />
+                <Button Content="Speichern" Padding="18,9" Click="OnSaveClick"
+                        Style="{DynamicResource AppPrimaryButtonStyle}" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

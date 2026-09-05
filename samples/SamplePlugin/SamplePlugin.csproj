@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Vorlage-Plugin (Plan-Plugin-Schnittstelle.md, P3): zeigt alle Beitragspunkte
+    des Vertrags an einem minimalen, aber vollstaendigen Beispiel. Bewusst NICHT
+    per ProjectReference vom Host referenziert — ein Plugin ist zur Compile-Zeit
+    unabhaengig von CMISPilot.Desktop, nur ueber CMISPilot.Plugins.Abstractions
+    verbunden. Mitgliedschaft in CMISPilot.sln ist keine Abhaengigkeit, nur der
+    Schutz davor, dass dieses Projekt beim Bauen unbemerkt verrottet.
+    Bauweg: siehe README.md in diesem Ordner.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SamplePlugin</RootNamespace>
+    <AssemblyName>SamplePlugin</AssemblyName>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CMISPilot.Plugins.Abstractions\CMISPilot.Plugins.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fluent.Ribbon" Version="11.0.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!--
+      Ziel des Post-Build-Kopierens (siehe Target unten): das Plugins/-Verzeichnis
+      des Hosts, zur selben Konfiguration wie dieser Build (Debug -> Debug,
+      Release -> Release). "net10.0-windows" ist hier bewusst wörtlich statt
+      $(TargetFramework), weil es CMISPilot.Desktop.csproj' eigenes Zielframework
+      meint, nicht das dieses Plugin-Projekts - beide sind heute gleich, müssen es
+      aber nicht bleiben.
+    -->
+    <CmisPilotPluginsDir>$(MSBuildThisFileDirectory)..\..\src\CMISPilot.Desktop\bin\$(Configuration)\net10.0-windows\Plugins\</CmisPilotPluginsDir>
+  </PropertyGroup>
+
+  <!--
+    Kopiert die gebaute Plugin-DLL (+ PDB) direkt ins Plugins/-Verzeichnis von
+    CMISPilot.Desktop, damit der manuelle Kopierschritt aus README.md beim
+    Entwickeln entfällt. Ohne diesen Schritt zum Ausprobieren bleibt
+    README.md's manuelle Anleitung weiterhin richtig (z. B. für ein Plugin in
+    einem eigenen Repo ohne diesen Host-Pfad in Reichweite).
+  -->
+  <Target Name="CopyToCmisPilotPluginsDir" AfterTargets="Build">
+    <ItemGroup>
+      <_PluginOutputFiles Include="$(TargetDir)$(TargetName).dll" />
+      <_PluginOutputFiles Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PluginOutputFiles)" DestinationFolder="$(CmisPilotPluginsDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

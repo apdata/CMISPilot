@@ -1,0 +1,100 @@
+<Window x:Class="CMISPilot.Desktop.Dialogs.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:conv="clr-namespace:CMISPilot.Desktop.Converters"
+        mc:Ignorable="d"
+        Title="{Binding ProductName, StringFormat='Über {0}'}"
+        Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Foreground="{DynamicResource AppTextPrimaryBrush}"
+        Background="{DynamicResource AppSurfaceBrush}">
+
+    <Window.Resources>
+        <conv:StringToVisibilityConverter x:Key="StringToVis" />
+    </Window.Resources>
+
+    <!-- Breite bewusst großzügig (520 statt 420): die deutschen Texte sind deutlich
+         länger als die englischen, und der Kopfbereich soll nicht umbrechen. Höhe
+         weiterhin über SizeToContent, damit die Komponententabelle wachsen darf. -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Kopfbereich: Akzentfläche mit Symbol, Produktname und Version. -->
+        <Border Grid.Row="0" Background="{DynamicResource AppAccentBrush}" Padding="24,20">
+            <DockPanel>
+                <Image DockPanel.Dock="Left" Source="{StaticResource Icon.About}"
+                       Width="48" Height="48" VerticalAlignment="Top" Margin="0,0,16,0" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ProductName}" Foreground="White"
+                               FontWeight="SemiBold" FontSize="24" TextWrapping="Wrap" />
+                    <TextBlock Foreground="White" Opacity="0.85" Margin="0,4,0,0">
+                        <Run Text="Version" />
+                        <Run Text="{Binding Version, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock Text="{Binding InformationalVersion}" Foreground="White"
+                               Opacity="0.7" FontSize="11" Margin="0,2,0,0"
+                               Visibility="{Binding InformationalVersion, Converter={StaticResource StringToVis}}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Inhalt: Beschreibung, Copyright, Komponententabelle. -->
+        <StackPanel Grid.Row="1" Margin="24,20,24,0">
+            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" />
+
+            <TextBlock Margin="0,12,0,0" Opacity="0.75" FontSize="11">
+                <Run Text="Läuft unter .NET" />
+                <Run Text="{Binding RuntimeVersion, Mode=OneWay}" />
+            </TextBlock>
+
+            <TextBlock Text="{Binding Copyright}" Margin="0,12,0,0" Opacity="0.8" TextWrapping="Wrap" />
+
+            <TextBlock Text="Verwendete Komponenten" FontWeight="SemiBold" Margin="0,20,0,6" />
+
+            <!-- Bewusst ein ItemsControl statt eines DataGrid: die Liste ist fest,
+                 nicht sortierbar und nicht auswählbar - ein Grid brächte hier nur
+                 Kopfzeilen und Zellrahmen, die niemand braucht. -->
+            <Border BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                    Background="{DynamicResource AppSurfaceAltBrush}" Padding="12,8">
+                <ItemsControl ItemsSource="{Binding Components}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,0,12,0"
+                                           Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding License}" FontSize="12"
+                                           Foreground="{DynamicResource AppTextSecondaryBrush}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <TextBlock Text="Die vollständigen Lizenztexte liegen in den jeweiligen Paketen und Repositories."
+                       TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="0,6,0,0" />
+        </StackPanel>
+
+        <!-- Schaltflächen: Auto-Spalten, damit die deutschen Beschriftungen passen. -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Margin="24,20,24,20">
+            <Button Content="Versionsinfo kopieren" Padding="14,4" Margin="0,0,8,0"
+                    Click="OnCopyVersionClick"
+                    ToolTip="Produkt, Version und .NET-Version in die Zwischenablage kopieren"
+                    Style="{DynamicResource AppSecondaryButtonStyle}" />
+            <Button Content="Schließen" IsCancel="True" IsDefault="True" Padding="14,4"
+                    Click="OnCloseClick"
+                    Style="{DynamicResource AppPrimaryButtonStyle}" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,169 @@
+<Window x:Class="CMISPilot.Desktop.Dialogs.ExtendedPropertiesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:conv="clr-namespace:CMISPilot.Desktop.Converters"
+        mc:Ignorable="d"
+        Title="{Binding Title}"
+        Width="820" Height="560" MinWidth="560" MinHeight="360"
+        WindowStartupLocation="CenterOwner"
+        Foreground="{DynamicResource AppTextPrimaryBrush}"
+        Background="{DynamicResource AppSurfaceBrush}">
+
+    <Window.Resources>
+        <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="15" />
+            <TextBlock Text="{Binding ObjectId, StringFormat=' ({0})'}" Opacity="0.6" VerticalAlignment="Bottom" Margin="6,0,0,0" />
+        </StackPanel>
+
+        <TabControl Grid.Row="1">
+
+            <!-- Alle Properties inkl. Mehrfachwerte/Query-Name/Local-Name (R6.1). -->
+            <TabItem Header="Properties">
+                <!-- IsReadOnly bewusst False: Zellen sollen sich zum Kopieren eines
+                     Teilstrings in den Bearbeitungsmodus versetzen lassen.
+                     ExtendedPropertyRowViewModel ist ein reines Anzeigeobjekt, ein
+                     Commit landet nirgends - keine echte Aenderung moeglich. -->
+                <DataGrid ItemsSource="{Binding Properties}" AutoGenerateColumns="False"
+                          IsReadOnly="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          HorizontalScrollBarVisibility="Auto" ClipboardCopyMode="IncludeHeader"
+                          PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                          Foreground="{DynamicResource AppTextPrimaryBrush}">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                                <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Displayname" Binding="{Binding DisplayName}" Width="1.4*" />
+                        <DataGridTextColumn Header="PropertyID" Binding="{Binding PropertyId}" Width="1.6*" />
+                        <DataGridTextColumn Header="Local-Name" Binding="{Binding LocalName}" Width="*" />
+                        <DataGridTextColumn Header="Query-Name" Binding="{Binding QueryName}" Width="*" />
+                        <DataGridTextColumn Header="Datentyp" Binding="{Binding DataType}" Width="Auto" />
+                        <DataGridCheckBoxColumn Header="mehrwertig" Binding="{Binding IsMultiValued}" Width="Auto" />
+                        <DataGridCheckBoxColumn Header="Pflichtfeld" Binding="{Binding IsRequired}" Width="Auto" />
+                        <DataGridTextColumn Header="Wert" Binding="{Binding Value}" Width="2*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <!-- Typdefinition + Vererbung: konkreter Typ zuerst, dann die Kette bis zum Basistyp. -->
+            <TabItem Header="Typ &amp; Vererbung">
+                <ListView ItemsSource="{Binding TypeHierarchy}" Foreground="{DynamicResource AppTextPrimaryBrush}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Displayname" DisplayMemberBinding="{Binding DisplayName}" Width="180" />
+                            <GridViewColumn Header="ID" DisplayMemberBinding="{Binding Id}" Width="220" />
+                            <GridViewColumn Header="Basistyp" DisplayMemberBinding="{Binding BaseType}" Width="100" />
+                            <GridViewColumn Header="Übergeordneter Typ" DisplayMemberBinding="{Binding ParentTypeId}" Width="200" />
+                            <GridViewColumn Header="creatable" DisplayMemberBinding="{Binding IsCreatable}" Width="70" />
+                            <GridViewColumn Header="queryable" DisplayMemberBinding="{Binding IsQueryable}" Width="70" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </TabItem>
+
+            <!-- Allowable Actions (FA-75). -->
+            <TabItem Header="Allowable Actions">
+                <Grid>
+                    <TextBlock Text="Keine Allowable Actions geladen." HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Opacity="0.6" Visibility="{Binding HasAllowableActions, Converter={StaticResource InverseBoolToVis}}" />
+                    <ListBox ItemsSource="{Binding AllowableActions}" BorderThickness="0"
+                             Visibility="{Binding HasAllowableActions, Converter={StaticResource BoolToVis}}" />
+                </Grid>
+            </TabItem>
+
+            <!-- ACL (R6.1, neu ueber IObjectService.GetAclAsync). -->
+            <TabItem Header="ACL">
+                <Grid>
+                    <TextBlock Text="Keine ACL-Einträge (nicht unterstützt oder leer)." HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Opacity="0.6" TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center"
+                               Visibility="{Binding HasAclEntries, Converter={StaticResource InverseBoolToVis}}" />
+                    <DataGrid ItemsSource="{Binding AclEntries}" AutoGenerateColumns="False"
+                              IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" Foreground="{DynamicResource AppTextPrimaryBrush}"
+                              ClipboardCopyMode="IncludeHeader"
+                              PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                              Visibility="{Binding HasAclEntries, Converter={StaticResource BoolToVis}}">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                                    <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                                    <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Principal" Binding="{Binding PrincipalId}" Width="*" />
+                            <DataGridTextColumn Header="Berechtigungen" Binding="{Binding Permissions}" Width="2*" />
+                            <DataGridCheckBoxColumn Header="direkt" Binding="{Binding IsDirect}" Width="Auto" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Versionsreihe (R6.1, neu ueber IObjectService.GetAllVersionsAsync; nur Dokumente). -->
+            <TabItem Header="Versionsreihe">
+                <Grid>
+                    <TextBlock Text="Keine Versionsreihe (Ordner oder nicht versionierbar)." HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Opacity="0.6" TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center"
+                               Visibility="{Binding HasVersions, Converter={StaticResource InverseBoolToVis}}" />
+                    <DataGrid ItemsSource="{Binding Versions}" AutoGenerateColumns="False"
+                              IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" HorizontalScrollBarVisibility="Auto"
+                              ClipboardCopyMode="IncludeHeader"
+                              PreviewMouseRightButtonDown="OnGridRowPreviewMouseRightButtonDown"
+                              Foreground="{DynamicResource AppTextPrimaryBrush}"
+                              Visibility="{Binding HasVersions, Converter={StaticResource BoolToVis}}">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Zeile kopieren" Click="OnCopyRowClick">
+                                    <MenuItem.Icon><Image Source="{StaticResource Icon.CopyRow}" Width="16" Height="16" /></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Alle Zeilen kopieren" Click="OnCopyAllRowsClick">
+                                    <MenuItem.Icon><Image Source="{StaticResource Icon.CopyAllRows}" Width="16" Height="16" /></MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Label" Binding="{Binding VersionLabel}" Width="Auto" />
+                            <DataGridCheckBoxColumn Header="neueste" Binding="{Binding IsLatestVersion}" Width="Auto" />
+                            <DataGridCheckBoxColumn Header="Major" Binding="{Binding IsMajorVersion}" Width="Auto" />
+                            <DataGridTextColumn Header="Geändert von" Binding="{Binding LastModifiedBy}" Width="*" />
+                            <DataGridTextColumn Header="Geändert am" Binding="{Binding LastModificationDate, StringFormat=g}" Width="*" />
+                            <DataGridTextColumn Header="Checkin-Kommentar" Binding="{Binding CheckinComment}" Width="2*" />
+                            <DataGridTextColumn Header="Dateiname" Binding="{Binding ContentStreamFileName}" Width="*" />
+                            <DataGridTextColumn Header="Größe" Binding="{Binding ContentStreamLength}" Width="Auto" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Schließen" Padding="14,4" IsCancel="True" IsDefault="True" Click="OnCloseClick"
+                    Style="{DynamicResource AppSecondaryButtonStyle}" />
+        </StackPanel>
+    </Grid>
+</Window>
