@@ -27,3 +27,8 @@ packages/
 
 # Zur Laufzeit hierhin kopierte Plugins (Build-Ausgabe, nicht versioniert)
 /src/CMISPilot.Desktop/bin/*/*/Plugins/
+
+# Release-Artefakte (ZIP/MSI, lokal gebaut, nicht versioniert)
+/artifacts/
+*.wixpdb
+.wix/

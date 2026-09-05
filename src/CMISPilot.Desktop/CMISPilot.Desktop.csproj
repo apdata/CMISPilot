@@ -12,7 +12,7 @@
     <!-- R6.4: Assembly-Metadaten fuer das "Ueber CMISPilot"-Fenster (AboutViewModel
          liest sie per Reflection aus dem Einstiegsassembly). -->
     <Product>CMISPilot</Product>
-    <Version>0.6.0</Version>
+    <Version>0.1.0</Version>
     <Copyright>© 2026 CMISPilot-Projekt</Copyright>
     <Description>CMISPilot – Werkbank fuer CMIS-Repositories (Browser Binding).</Description>
 
